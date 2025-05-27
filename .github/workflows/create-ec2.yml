@@ -1,16 +1,26 @@
-name: Create EC2 Instance
+name: Create EC2 Ubuntu Instance
 
 on:
   workflow_dispatch:
 
 jobs:
-  create-ec2:
+  create-ec2-instance:
     runs-on: ubuntu-latest
+
     outputs:
-      instance_id: ${{ steps.launch.outputs.instance_id }}
-      public_ip: ${{ steps.get_ip.outputs.public_ip }}
+      instance_id: ${{ steps.create.outputs.instance_id }}
+      public_ip: ${{ steps.getip.outputs.public_ip }}
 
     steps:
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip curl
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
+          aws --version
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -18,35 +28,40 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Launch EC2 instance
-        id: launch
+      - name: Get latest Ubuntu AMI ID
+        id: getami
         run: |
-          IMAGE_ID=$(aws ec2 describe-images \
+          AMI_ID=$(aws ec2 describe-images \
             --owners 099720109477 \
             --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" \
                       "Name=state,Values=available" \
             --query "sort_by(Images, &CreationDate)[-1].ImageId" \
             --output text)
+          echo "ami_id=$AMI_ID" >> $GITHUB_ENV
 
+      - name: Launch EC2 Instance
+        id: create
+        run: |
           INSTANCE_ID=$(aws ec2 run-instances \
-            --image-id $IMAGE_ID \
+            --image-id ${{ env.ami_id }} \
             --count 1 \
             --instance-type t2.micro \
-            --key-name devops-key \  # Your existing key pair
+            --key-name devops-key \
+            --security-groups default \
             --query 'Instances[0].InstanceId' \
             --output text)
-
           echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
 
       - name: Wait for EC2 to be running
-        run: aws ec2 wait instance-running --instance-ids ${{ steps.launch.outputs.instance_id }}
+        run: aws ec2 wait instance-running --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Get Public IP
-        id: get_ip
+        id: getip
         run: |
           PUBLIC_IP=$(aws ec2 describe-instances \
-            --instance-ids ${{ steps.launch.outputs.instance_id }} \
+            --instance-ids ${{ env.INSTANCE_ID }} \
             --query "Reservations[0].Instances[0].PublicIpAddress" \
             --output text)
           echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
-          echo "EC2 public IP: $PUBLIC_IP"
+          echo "✅ EC2 instance is running at IP: $PUBLIC_IP"
