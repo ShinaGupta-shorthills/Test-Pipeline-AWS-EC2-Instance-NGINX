@@ -41,10 +41,8 @@ jobs:
           echo "Launched instance with ID: $INSTANCE_ID"
           echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
 
-          # Wait for the instance to be running
           aws ec2 wait instance-running --instance-ids $INSTANCE_ID --region us-east-1
 
-          # Get the public IP of the instance
           PUBLIC_IP=$(aws ec2 describe-instances \
             --instance-ids $INSTANCE_ID \
             --region us-east-1 \
@@ -54,10 +52,16 @@ jobs:
           echo "EC2_PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_ENV
           echo "Instance Public IP: $PUBLIC_IP"
 
-      - name: Upload public IP as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ec2-public-ip
-          path: ec2_public_ip.txt
+      - name: Wait for EC2 SSH to become available
+        run: |
+          echo "Waiting 60 seconds for SSH service to be ready..."
+          sleep 60
 
-    
+      - name: Install Nginx on EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i devops-key-1.pem ubuntu@$EC2_PUBLIC_IP << EOF
+            sudo apt update
+            sudo apt install -y nginx
+            sudo systemctl enable nginx
+            sudo systemctl start nginx
+          EOF
