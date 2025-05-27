@@ -1,0 +1,10 @@
+🚀 How It Works (Layman Explanation)
+You push this code or run the GitHub Action manually.
+
+GitHub uses your AWS credentials to call EC2.
+
+A new virtual machine (EC2) is created.
+
+As it boots, it runs a script (nginx-install.sh) that installs and starts NGINX.
+
+You now have a live server with NGINX running.
