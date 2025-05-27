@@ -33,7 +33,6 @@ jobs:
             --count 1 \
             --instance-type t2.micro \
             --key-name devops-key \  # Your existing key pair
-            --security-groups default \
             --query 'Instances[0].InstanceId' \
             --output text)
 
