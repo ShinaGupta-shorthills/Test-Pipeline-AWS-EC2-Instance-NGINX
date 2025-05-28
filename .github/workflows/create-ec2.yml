@@ -65,3 +65,36 @@ jobs:
             sudo systemctl enable nginx
             sudo systemctl start nginx
           EOF
+
+  notify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Notify Microsoft Teams
+        run: |
+          RESULT="${{ needs.deploy.result }}"
+          COLOR="FFA500"
+          STATUS="⚠️ Deployment Status Unknown"
+
+          if [ "$RESULT" == "success" ]; then
+            COLOR="00FF00"
+            STATUS="✅ Deployment Succeeded"
+          elif [ "$RESULT" == "failure" ]; then
+            COLOR="FF0000"
+            STATUS="❌ Deployment Failed"
+          fi
+
+          curl -H 'Content-Type: application/json' \
+            -d "{
+              \"@type\": \"MessageCard\",
+              \"@context\": \"http://schema.org/extensions\",
+              \"themeColor\": \"$COLOR\",
+              \"summary\": \"EC2 Deployment Status\",
+              \"sections\": [{
+                \"activityTitle\": \"$STATUS\",
+                \"text\": \"The EC2 deployment workflow has completed with result: **$RESULT**.\n\n[View Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\"
+              }]
+            }" \
+            ${{ secrets.TEAMS_WEBHOOK }}
