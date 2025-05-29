@@ -1,7 +1,10 @@
 name: Deploy EC2 Ubuntu Instance
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+  
 
 jobs:
   deploy:
